@@ -1,6 +1,6 @@
 # E-Bike Firmware
 
-This is the firmware for my e-bike. It runs on an Arduino Uno clone (DCCDuino).
+This is the firmware for the DCCDuino (Arduino Uno clone) on my e-bike. It's an Arduino Uno clone (DCCDuino).
 
 ## Features
 

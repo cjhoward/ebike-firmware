@@ -17,76 +17,79 @@
  * along with E-Bike Firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-uint8_t segmentData[6][8] =
+#include "font.hpp"
+#include <stdint.h>
+
+static const uint8_t segmentData[6][8] =
 {
   {
-    B11111,
-    B11111,
-    B00000,
-    B00000,
-    B00000,
-    B00000,
-    B00000,
-    B00000
+    0b11111,
+    0b11111,
+    0b00000,
+    0b00000,
+    0b00000,
+    0b00000,
+    0b00000,
+    0b00000
   },
 
   {
-    B00000,
-    B00000,
-    B00000,
-    B00000,
-    B00000,
-    B00000,
-    B11111,
-    B11111
+    0b00000,
+    0b00000,
+    0b00000,
+    0b00000,
+    0b00000,
+    0b00000,
+    0b11111,
+    0b11111
   },
 
   {
-    B11111,
-    B11111,
-    B11111,
-    B11111,
-    B11111,
-    B11111,
-    B11111,
-    B11111
+    0b11111,
+    0b11111,
+    0b11111,
+    0b11111,
+    0b11111,
+    0b11111,
+    0b11111,
+    0b11111
   },
 
   {
-    B11111,
-    B11111,
-    B00000,
-    B00000,
-    B00000,
-    B00000,
-    B11111,
-    B11111
+    0b11111,
+    0b11111,
+    0b00000,
+    0b00000,
+    0b00000,
+    0b00000,
+    0b11111,
+    0b11111
   },
 
   {
-    B11111,
-    B11111,
-    B11111,
-    B11111,
-    B00000,
-    B00000,
-    B00000,
-    B00000
+    0b11111,
+    0b11111,
+    0b11111,
+    0b11111,
+    0b00000,
+    0b00000,
+    0b00000,
+    0b00000
   },
 
   {
-    B00000,
-    B00000,
-    B00000,
-    B00000,
-    B00000,
-    B01110,
-    B01110,
-    B01110
+    0b00000,
+    0b00000,
+    0b00000,
+    0b00000,
+    0b00000,
+    0b01110,
+    0b01110,
+    0b01110
   }
 };
 
-uint8_t numberFont[11][6] =
+static const uint8_t numberFont[11][6] =
 {
   // 0
   {
@@ -155,7 +158,13 @@ uint8_t numberFont[11][6] =
   }
 };
 
-int segmentCount = 6;
+void loadFont(const LiquidCrystal& lcd)
+{
+  for (int i = 0; i < 6; ++i)
+  {
+    lcd.createChar(i, segmentData[i]);
+  }
+}
 
 void printBig(const LiquidCrystal& lcd, int x, int number)
 {

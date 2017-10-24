@@ -20,19 +20,28 @@
 #include <EEPROM.h>
 #include <LiquidCrystal.h>
 #include <math.h>
-#include "font.h"
+#include "font.hpp"
+#include "speedometer.hpp"
 
+// Configuration
 #define PIN_HALL 2
 #define PIN_LCD_PWR 7
 #define PIN_LCD_RS 12
 #define PIN_LCD_EN 11
-#define PIN_LCD_D4 5
+#define PIN_LCD_D4 3
 #define PIN_LCD_D5 4
-#define PIN_LCD_D6 3
+#define PIN_LCD_D6 5
 #define PIN_LCD_D7 6
-
 #define ADDRESS_TOP_SPEED 0x00
 #define ADDRESS_TOTAL_DISTANCE (ADDRESS_TOP_SPEED + sizeof(float))
+#define WHEEL_DIAMETER 670
+#define HALL_SENSOR_MIN_INTERVAL 1000        // 1000 microseconds
+#define HALL_SENSOR_MAX_INTERVAL 5 * 1000000 // 5 seconds
+#define SPEEDOMETER_DEFAULT_DISPLAY_MODE Speedometer::DisplayMode::CURRENT_SPEED
+#define SPEEDOMETER_DEFAULT_SPEED_UNIT Speedometer::SpeedUnit::MPH
+
+template <typename T> size_t writeEEPROM(int address, const T& value);
+template <typename T> size_t readEEPROM(int address, T* value);
 
 LiquidCrystal lcd
 (
@@ -44,21 +53,56 @@ LiquidCrystal lcd
   PIN_LCD_D7
 );
 
-float topSpeed = 0.0f;
-float totalDistance = 0.0f;
-float speed = 0.0f;
-double rpm = 0.0d;
-int state = 0;
-char speedString[5];
-unsigned long hallTime = 0;
-unsigned long distanceTime = 0;
-int hallPulses = 0;
-float wheelDiameter = 0.670; // (0.622 rim + 0.048 tire) (700c)
-float wheelCircumference = wheelDiameter * M_PI;
-float rpmToKPH = wheelCircumference * (60.0f / 1000.0f);
+Speedometer& speedometer = Speedometer::instance();
 
-bool printTopSpeed = false;
-bool printTotalDistance = true;
+void setup()
+{
+  // Restart LCD
+  pinMode(PIN_LCD_PWR, OUTPUT);
+  digitalWrite(PIN_LCD_PWR, LOW);
+  delay(10);
+  digitalWrite(PIN_LCD_PWR, HIGH);
+  
+  // Initialize LCD
+  lcd.begin(16, 2);
+  loadFont(lcd);
+
+  // Read saved data from EEPROM
+  float topSpeed = 0.0f;
+  float totalDistance = 0.0f;
+  readEEPROM<float>(ADDRESS_TOP_SPEED, &topSpeed);
+  readEEPROM<float>(ADDRESS_TOTAL_DISTANCE, &totalDistance);
+
+  // Initialize speedometer
+  speedometer.init(PIN_HALL);
+  speedometer.setWheelDiameter(WHEEL_DIAMETER);
+  speedometer.setTopSpeed(topSpeed);
+  speedometer.setTotalDistance(totalDistance);
+  speedometer.setHallSensorMinimumInterval(HALL_SENSOR_MIN_INTERVAL);
+  speedometer.setHallSensorMaximumInterval(HALL_SENSOR_MAX_INTERVAL);
+  speedometer.setDisplayMode(SPEEDOMETER_DEFAULT_DISPLAY_MODE);
+  speedometer.setSpeedUnit(SPEEDOMETER_DEFAULT_SPEED_UNIT);
+}
+
+void loop()
+{
+  // Get elapsed time in microseconds
+  unsigned long ms = micros();
+
+  // Save top speed and total distance to EEPROM every 30 seconds
+  /*
+  if (ms - distanceTime > 30 * 1000000)
+  {
+    writeEEPROM<float>(ADDRESS_TOTAL_DISTANCE, totalDistance);
+    
+    writeEEPROM<float>(ADDRESS_TOP_SPEED, topSpeed);
+    distanceTime = ms;
+  }
+  */
+  
+  speedometer.update(ms);
+  speedometer.display(lcd);
+}
 
 template <typename T> size_t writeEEPROM(int address, const T& value)
 {
@@ -80,145 +124,4 @@ template <typename T> size_t readEEPROM(int address, T* value)
     *data++ = EEPROM.read(address++);
 
   return i;
-}
-
-void hallIRQ()
-{
-  unsigned long ms = micros();
-  unsigned long interval = ms - hallTime;
-  
-  // Debounce
-  if (interval < 1000)
-  {
-    return;
-  }
-
-  // Calculate RPM
-  rpm = 60000000.0d / (double)interval;
-
-  // Add circumference to total distance
-  totalDistance += wheelCircumference;
-
-  // Update hall time
-  hallTime = ms;
-}
-
-void setup()
-{
-  // Restart LCD
-  pinMode(PIN_LCD_PWR, OUTPUT);
-  digitalWrite(PIN_LCD_PWR, LOW);
-  delay(10);
-  digitalWrite(PIN_LCD_PWR, HIGH);
-  
-  // Initialize LCD
-  lcd.begin(16, 2);
-  lcd.noAutoscroll();
-  lcd.clear();
-
-  // Load custom font
-  for (int i = 0; i < segmentCount; ++i)
-  {
-    lcd.createChar(i, segmentData[i]);
-  }
-  
-  // Read saved data from EEPROM
-  readEEPROM<float>(ADDRESS_TOP_SPEED, &topSpeed);
-  readEEPROM<float>(ADDRESS_TOTAL_DISTANCE, &totalDistance);
-  
-  // Print initial screen to LCD
-  /*
-  lcd.setCursor(0, 1);
-  lcd.print("SPEED:  0.0 km/h");
-  if (printTopSpeed)
-  {
-    lcd.setCursor(0, 0);
-    lcd.print("TOP:    0.0 km/h");
-    dtostrf(topSpeed, 4, 1, speedString);
-    lcd.setCursor(7, 0);
-    lcd.print(speedString);
-  }
-  else if (printTotalDistance)
-  {
-    lcd.setCursor(0, 0);
-    lcd.print("DIST:         km");
-    dtostrf(totalDistance * 0.001, 4, 1, speedString);
-    lcd.setCursor(9, 0);
-    lcd.print(speedString);
-  }
-  */
-  lcd.setCursor(12, 1);
-  lcd.print("km/h");
-  
-  // Setup Hall sensor and IRQ
-  pinMode(PIN_HALL, INPUT);
-  attachInterrupt(digitalPinToInterrupt(PIN_HALL), hallIRQ, RISING);
-}
-
-void loop()
-{
-  unsigned long ms = micros();
-  
-  // If too much time has passed between Hall interrupts
-  if (ms - hallTime > 5 * 1000000)
-  {
-    // Reset RPM
-    rpm = 0.0f;
-  }
-
-  // Save total distance to EEPROM every 30 seconds
-  if (ms - distanceTime > 60 * 1000000)
-  {
-    writeEEPROM<float>(ADDRESS_TOTAL_DISTANCE, totalDistance);
-    distanceTime = ms;
-  }
-
-  // Calculate speed
-  speed = rpm * rpmToKPH;
-  if (speed > topSpeed)
-  {
-    // Update top speed
-    topSpeed = speed;
-
-    // Print top speed
-    if (printTopSpeed)
-    {
-      dtostrf(topSpeed, 4, 1, speedString);
-      lcd.setCursor(7, 0);
-      lcd.print(speedString);
-    }
-    
-    // Write top speed to EEPROM
-    writeEEPROM<float>(ADDRESS_TOP_SPEED, topSpeed);
-  }
-
-  if (printTotalDistance)
-  {
-    dtostrf(totalDistance * 0.001, 4, 1, speedString);
-    lcd.setCursor(9, 0);
-    //lcd.print(speedString);
-  }
-  
-  // Print speed
-  dtostrf((float)speed, 4, 1, speedString);
-  lcd.setCursor(7, 1);
-  //lcd.print(speedString);
-
-  double integerPart;
-  double fractionPart;
-  fractionPart = modf(speed + 0.05d, &integerPart);
-
-  int digit0 = (int)(integerPart / 10.0d);
-  if (!digit0)
-    digit0 = 10;
-  int digit1 = (int)(integerPart) % 10;
-  int digit2 = (int)(fractionPart * 10.0d);
-
-  
-  printBig(lcd, 0, digit0);
-  printBig(lcd, 4, digit1);
-  printBig(lcd, 8, digit2);
-
-  lcd.setCursor(7, 1);
-  lcd.write(5);
 }
