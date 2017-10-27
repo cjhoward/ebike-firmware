@@ -34,11 +34,12 @@
 #define PIN_LCD_D7 6
 #define ADDRESS_TOP_SPEED 0x00
 #define ADDRESS_TOTAL_DISTANCE (ADDRESS_TOP_SPEED + sizeof(float))
-#define WHEEL_DIAMETER 670
+#define WHEEL_DIAMETER 630
 #define HALL_SENSOR_MIN_INTERVAL 1000        // 1000 microseconds
 #define HALL_SENSOR_MAX_INTERVAL 5 * 1000000 // 5 seconds
 #define SPEEDOMETER_DEFAULT_DISPLAY_MODE Speedometer::DisplayMode::CURRENT_SPEED
 #define SPEEDOMETER_DEFAULT_SPEED_UNIT Speedometer::SpeedUnit::MPH
+#define EEPROM_WRITE_INTERVAL 30 * 1000000 // 30 seconds
 
 template <typename T> size_t writeEEPROM(int address, const T& value);
 template <typename T> size_t readEEPROM(int address, T* value);
@@ -54,6 +55,7 @@ LiquidCrystal lcd
 );
 
 Speedometer& speedometer = Speedometer::instance();
+unsigned long saveTime;
 
 void setup()
 {
@@ -82,6 +84,8 @@ void setup()
   speedometer.setHallSensorMaximumInterval(HALL_SENSOR_MAX_INTERVAL);
   speedometer.setDisplayMode(SPEEDOMETER_DEFAULT_DISPLAY_MODE);
   speedometer.setSpeedUnit(SPEEDOMETER_DEFAULT_SPEED_UNIT);
+
+  saveTime = micros();
 }
 
 void loop()
@@ -90,15 +94,13 @@ void loop()
   unsigned long ms = micros();
 
   // Save top speed and total distance to EEPROM every 30 seconds
-  /*
-  if (ms - distanceTime > 30 * 1000000)
+  if (ms - saveTime > EEPROM_WRITE_INTERVAL)
   {
-    writeEEPROM<float>(ADDRESS_TOTAL_DISTANCE, totalDistance);
+    writeEEPROM<float>(ADDRESS_TOTAL_DISTANCE, speedometer.getTotalDistance());
+    writeEEPROM<float>(ADDRESS_TOP_SPEED, speedometer.getTopSpeed());
     
-    writeEEPROM<float>(ADDRESS_TOP_SPEED, topSpeed);
-    distanceTime = ms;
+    saveTime = ms;
   }
-  */
   
   speedometer.update(ms);
   speedometer.display(lcd);

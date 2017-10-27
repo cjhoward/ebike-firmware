@@ -87,6 +87,12 @@ public:
   /// Sets the speed unit
   void setSpeedUnit(SpeedUnit unit);
 
+  /// Returns the total distance
+  float getTotalDistance() const;
+
+  /// Returns the top speed
+  float getTopSpeed() const;
+
 private:
   Speedometer();
   Speedometer(const Speedometer&) = delete;
@@ -112,6 +118,16 @@ private:
   DisplayMode displayMode;
   SpeedUnit speedUnit;
 };
+
+inline float Speedometer::getTotalDistance() const
+{
+  return totalDistance;
+}
+
+inline float Speedometer::getTopSpeed() const
+{
+  return topSpeed;
+}
 
 #endif // SPEEDOMETER_HPP
 
