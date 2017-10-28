@@ -7,10 +7,9 @@ This is the firmware for the DCCDuino (Arduino Uno clone) on my e-bike.
 ### Current
 
 * Speedometer
-* Powered by power bank
+* Odometer
 
 ### Planned
 
 * Head and tail light controls
 * NFC reader
-* Powered by e-bike battery
